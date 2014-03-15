@@ -13,11 +13,13 @@ import android.view.SurfaceHolder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 
 public class MyWallpaperService extends WallpaperService {
 
     private static final String LOG_TAG = MyWallpaperService.class.getSimpleName();
+    final static Random RANDY = new Random();
 
     @Override
     public Engine onCreateEngine() {
@@ -28,9 +30,10 @@ public class MyWallpaperService extends WallpaperService {
         private final Handler handler = new Handler();
 
         private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private int currentColor = 0xffffffff;
 
         private final SvgHelper mSvg = new SvgHelper(mPaint);
-        private int mSvgResource = R.raw.seahawks_3;
+        private int mSvgResource = R.raw.android;
 
         private final Object mSvgLock = new Object();
         private List<SvgHelper.SvgPath> mPaths = new ArrayList<SvgHelper.SvgPath>(0);
@@ -44,14 +47,13 @@ public class MyWallpaperService extends WallpaperService {
 
         };
         private float mPhase = 1f;
-        private int width;
-        int height;
         private boolean visible = true;
 
         public MyWallpaperEngine() {
-            mPaint.setColor(Color.WHITE);
+
+            mPaint.setStrokeWidth(3.5f);
             mPaint.setStyle(Paint.Style.STROKE);
-            mPaint.setStrokeWidth(1f);
+            mPaint.setStrokeJoin(Paint.Join.ROUND);
             handler.post(drawRunner);
         }
 
@@ -75,8 +77,6 @@ public class MyWallpaperService extends WallpaperService {
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format,
                                      final int width, final int height) {
-            this.width = width;
-            this.height = height;
             super.onSurfaceChanged(holder, format, width, height);
 
             if (mLoader != null) {
@@ -93,7 +93,7 @@ public class MyWallpaperService extends WallpaperService {
                     mSvg.load(MyWallpaperService.this, mSvgResource);
                     synchronized (mSvgLock) {
                         mPaths = mSvg.getPathsForViewport(width, height);
-                        setPhase(.99f);
+                        shouldRedraw = true;
                     }
                 }
             }, "SVG Loader");
@@ -110,14 +110,13 @@ public class MyWallpaperService extends WallpaperService {
             boolean didRedraw = false;
             try {
                 canvas = holder.lockCanvas();
-                if (canvas != null) {
+                if (canvas != null && shouldRedraw) {
                     synchronized (mSvgLock) {
+                        canvas.drawColor(Color.BLACK);
                         final int count = mPaths.size();
                         for (int i = 0; i < count; i++) {
                             SvgHelper.SvgPath svgPath = mPaths.get(i);
-
-//                            canvas.drawColor(Color.BLACK);
-
+                            svgPath.paint.setColor(currentColor);
                             canvas.drawPath(svgPath.path, svgPath.paint);
                         }
                         shouldRedraw = false;
@@ -129,9 +128,11 @@ public class MyWallpaperService extends WallpaperService {
                     holder.unlockCanvasAndPost(canvas);
             }
             if (didRedraw) {
-                setPhase(mPhase - 0.01f);
-                handler.removeCallbacks(drawRunner);
-                handler.postDelayed(drawRunner, 100);
+                setPhase(mPhase - 0.005f);
+            }
+            handler.removeCallbacks(drawRunner);
+            if (visible) {
+                handler.postDelayed(drawRunner, 50);
             }
         }
 
@@ -145,7 +146,12 @@ public class MyWallpaperService extends WallpaperService {
         private boolean shouldRedraw = false;
 
         private void setPhase(float phase) {
-            mPhase = phase;
+            if (phase < 0) {
+                mPhase = 1.0f;
+                currentColor = 0xff000000 | RANDY.nextInt(0x00ffffff);
+            } else {
+                mPhase = phase;
+            }
             synchronized (mSvgLock) {
                 updatePathsPhaseLocked();
                 shouldRedraw = true;
