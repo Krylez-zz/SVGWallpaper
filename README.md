@@ -1,3 +1,3 @@
 SVGWallpaper
 ============
-A very rough implementation of an SVG wallpaper.
+A very rough implementation of an SVG live wallpaper for Android.
